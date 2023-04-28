@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "locale": "en_US.cp1252",
+  "metadata": {
+    "appmode": "jupyter-static",
+    "entrypoint": "sentiment_notebook.ipynb"
+  },
+  "python": {
+    "version": "3.9.12",
+    "package_manager": {
+      "name": "pip",
+      "version": "22.1.2",
+      "package_file": "requirements.txt"
+    }
+  },
+  "files": {}
+}
