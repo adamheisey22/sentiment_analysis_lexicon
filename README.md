@@ -1,52 +1,109 @@
-# Sentiment Analysis -- (Lexicon Approach)
-This repository maintains the code for scoring raw text of comments/raw text using NLTK's VADAR algorithm, NLTK's VADAR base lexicon, and a custom healthcare lexicon.
+# Sentiment Analysis with a Domain Lexicon
 
+## The problem
 
-**Setting up the virtual conda environment:**
+General-purpose sentiment models misread healthcare feedback. In everyday
+English, words like *wait*, *hours*, *parking*, or *insurance* are neutral, but in a
+patient survey comment they nearly always signal frustration. Words like
+*thorough* or *listened* are some of the strongest praise a clinic can get. An
+off-the-shelf scorer misses this, so it labels many genuinely negative comments
+as neutral or positive.
 
-1. Clone/download repository to your local machine 
-2. cd (change directory) to location of cloned repository (ex. ```cd Users/.../sentiment_analysis``` )
-3. Open Anaconda Prompt
-4. Run the command ```conda create --name sentiment_analysis python=3.9```
-5. Run the command ```activate sentiment_analysis``` in terminal 
-6. cd (change directory) to location of cloned repository (ex. ```cd Users/.../sentiment_analysis``` )
-7. Run the command ```pip install -r requirements.txt``` in terminal. This will install the necessary packages to run the scripts
-8. Run the command ```deactivate``` in terminal. 
+This project scores free-text survey comments, labels each one positive or
+negative, and flags statistically unusual comments for follow-up.
 
+## The approach
 
-**Important Information about the Lexicon:**
-- Additional healthcare lexicon keywords can be added to the health_lexicon.py file.
+1. **NLTK VADER as the base.** [VADER](https://github.com/cjhutto/vaderSentiment)
+   is a rule-based, lexicon-driven sentiment analyzer. It handles negation,
+   intensifiers ("very", "extremely"), capitalization, and punctuation emphasis,
+   and it needs no training data.
+2. **A custom domain lexicon on top.** `health_lexicon.py` holds about 120
+   hand-tuned word weights that are merged into VADER's lexicon at scoring time.
+   They override or extend VADER's defaults with healthcare-specific meanings,
+   e.g. `wait: -0.7`, `parking: -1.7`, `thorough: 1.7`.
+3. **Sentence-level scoring.** Each comment is split into sentences. Each
+   sentence gets a VADER compound score, and the scores are summed, so a long
+   comment with several complaints is not diluted by one polite sentence.
+4. **Normalization.** The summed score is mapped to the range (-1, 1) with
+   `score / sqrt(score² + 10)`.
+5. **Labeling and anomaly flags.** Scores ≥ 0 are labeled *Positive*, and
+   scores < 0 *Negative*. Comments more than 3 standard deviations from the
+   mean are flagged *Out of Control* for review.
 
+## How to run it
 
-**Running the Notebook:**
+Requires Python 3.12+.
 
-1. Enter the virtual environment with the following command: ```activate sentiment_analysis```
-2. Install NLTK files. This may require setting proxy : ```nltk.set_proxy(f'http://{USER}:{PASSWORD}@proxy:port')```
-3. Open and run the Jupyter notebook. The sql query may take a long time to load. To test it out, adjust the sql query to only return xx number of records.
+```bash
+git clone https://github.com/adamheisey22/sentiment_analysis_lexicon.git
+cd sentiment_analysis_lexicon
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-**USAGE**
+Then, from the repository root:
 
-**Input: 2 Arguments**
+```python
+import pandas as pd
+import sentiment_analyzer   # first import downloads the NLTK data it needs
 
-1. ```Dataframe (with comments column)```
-2. ```Name of comments/text column (str)```
+df = pd.DataFrame({"comments": [
+    "The staff were professional and thorough. Great visit!",
+    "Waited two hours. Parking was terrible.",
+]})
 
-**Output: Dataframe with additional columns**
+scored = sentiment_analyzer.get_sentiment_analysis(df, "comments")
+print(scored[["comments", "OVERALL_SCORE", "OVERALL_SENTIMENT"]])
+```
 
-1. ```SENTENCE_COMP``` : Dictionary output {sentence : score} for each sentence in comment/text
-2. ```SENTENCE_NUM``` : Number of sentences in comment/text
-3. ```SUM_SCORES``` : Sum of the individual sentence -- composite score
-4. ```OVERALL_SCORE``` : Normalizes column of sum_scores to be between -1 and 1. Values range from most negative (-1) to most postive (1)
-5. ```OVERALL_SENTIMENT``` : Lables "Positive" and "Negative" comments based on the overall_score. Scores greater than/equal to ZERO are "Positive" 
-6. ```SENTIMENT_IND``` : Indicator column 1 or 0 based on overall_sentiment. 1-positive, 0-Negative
-7. ```TEXT_WORDS``` : List of text tokens filtered for stopwords
-8. ```VIOL_DSC``` : Identifies statistical anomalies. "Out of Control" or "In Control"
-9. ```VIOL_IND``` : Indicator for statistical anomalies. 1-Out of Control, 0-In Control
+`get_sentiment_analysis(dataframe, column_name)` takes a DataFrame and the name
+of its text column. It returns the same DataFrame with these columns added:
 
-```sentiment_analyzer.get_sentiment_analysis(dataframe, "comments_column")```
+| Column | Description |
+|---|---|
+| `SENTENCE_COMP` | Dict of `{sentence: compound score}` for each sentence |
+| `SENTENCE_NUM` | Number of sentences in the comment |
+| `SUM_SCORES` | Sum of the sentence compound scores |
+| `OVERALL_SCORE` | `SUM_SCORES` normalized to (-1, 1) |
+| `OVERALL_SENTIMENT` | `"Positive"` if `OVERALL_SCORE >= 0`, else `"Negative"` |
+| `SENTIMENT_IND` | 1 = Positive, 0 = Negative |
+| `TEXT_WORDS` | Comment tokens with stopwords and words of 2 or fewer characters removed |
+| `VIOL_DSC` | `"Out of Control"` if the score is beyond ±3σ of the mean, else `"In Control"` |
+| `VIOL_IND` | 1 = Out of Control, 0 = In Control |
 
-**Citiations**
-Bird, Steven, Edward Loper and Ewan Klein (2009).
-Natural Language Processing with Python.  O'Reilly Media Inc.
+Missing comments are filled with `"No comment"` before scoring.
 
-For questions please reach out to **Adam Heisey** at ```admrussel@gmail.com```
+### Tuning the lexicon
+
+Add or adjust entries in the `health_lexicon` dict in `health_lexicon.py`.
+Weights use VADER's scale (roughly -4 to +4). Keys are case-sensitive.
+
+### Behind a corporate proxy
+
+If `nltk.download` can't reach the internet, configure your proxy with
+`nltk.set_proxy(...)` before importing `sentiment_analyzer`. Keep credentials
+in environment variables, never in the notebook.
+
+## Repository layout
+
+| File | Purpose |
+|---|---|
+| `sentiment_analyzer.py` | Scoring pipeline and evaluation helpers (`results_matrix` prints a classification report against labeled data) |
+| `health_lexicon.py` | Custom domain lexicon |
+| `sentiment_notebook_local.ipynb` | Local notebook walkthrough (loading data is left as a placeholder) |
+| `sentiment_notebook.py` | Databricks/PySpark version that reads a table and writes the scored results to a Delta table |
+| `dev/text_results.py` | Exploratory plotting helpers (also needs `plotly` and `matplotlib`) |
+
+## Citations
+
+- Bird, Steven, Edward Loper and Ewan Klein (2009). *Natural Language Processing
+  with Python.* O'Reilly Media Inc.
+- Hutto, C.J. and Gilbert, E. (2014). VADER: A Parsimonious Rule-based Model for
+  Sentiment Analysis of Social Media Text. *Eighth International Conference on
+  Weblogs and Social Media (ICWSM-14).*
+
+## Contact
+
+Questions: **Adam Heisey**, `admrussel@gmail.com`

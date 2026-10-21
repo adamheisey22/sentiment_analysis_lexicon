@@ -55,9 +55,9 @@ def get_sentiment_scores(df,data_column):
     #sentiment analyzer VADER in NLTK
     sid_analyzer = SentimentIntensityAnalyzer()
 
-    health_lexicon = health_lexicon.health_lexicon
+    domain_lexicon = health_lexicon.health_lexicon
 
-    sid_analyzer.lexicon.update(health_lexicon)
+    sid_analyzer.lexicon.update(domain_lexicon)
 
     df[f'{data_column} Positive Sentiment Score'] = df[data_column].astype(str).apply(lambda x: get_sentiment(x,sid_analyzer,'pos'))
     df[f'{data_column} Negative Sentiment Score'] = df[data_column].astype(str).apply(lambda x: get_sentiment(x,sid_analyzer,'neg'))
@@ -72,9 +72,9 @@ def get_overall_sentiment(df, data_column):
     #sentiment analyzer VADER in NLTK
     sid_analyzer = SentimentIntensityAnalyzer()
 
-    health_lexicon = health_lexicon.health_lexicon
+    domain_lexicon = health_lexicon.health_lexicon
 
-    sid_analyzer.lexicon.update(health_lexicon)
+    sid_analyzer.lexicon.update(domain_lexicon)
 
     df[f'{data_column} Compound Sentiment Score'] = df[data_column].astype(str).apply(lambda x: get_sentiment(x,sid_analyzer,'compound'))
     return df
@@ -107,9 +107,9 @@ def sent_dict(lst):
     
     sid_analyzer = SentimentIntensityAnalyzer()
 
-    health_lexicon = health_lexicon.health_lexicon
+    domain_lexicon = health_lexicon.health_lexicon
 
-    sid_analyzer.lexicon.update(health_lexicon)
+    sid_analyzer.lexicon.update(domain_lexicon)
     
     k=[]
     for i in lst:
@@ -123,9 +123,9 @@ def sent_json(lst):
     
     sid_analyzer = SentimentIntensityAnalyzer()
 
-    health_lexicon = health_lexicon.health_lexicon
+    domain_lexicon = health_lexicon.health_lexicon
 
-    sid_analyzer.lexicon.update(health_lexicon)
+    sid_analyzer.lexicon.update(domain_lexicon)
 
     k=[]
     for i in lst:
@@ -175,13 +175,6 @@ def pd_prep(df):
     
     #deals with the issues raised with dictionary and list types as output. Need to change 
     df['SENTENCE_COMP'] = 'Test version'
-    #define column types:
-    #df['PRVDR_ID'] = df['PRVDR_ID'].astype(int, errors='ignore')
-    #df['ATTENDING_PHYSICIAN_NPI'] = df['ATTENDING_PHYSICIAN_NPI'].astype(int, errors='ignore')
-    #df['BUSINESS_UNIT'] = df['BUSINESS_UNIT'].astype(int, errors='ignore')
-    #df['DEPT_NO'] = df['DEPT_NO'].astype(int, errors='ignore')
-    #df['DEPT_NO'] = df['DEPT_NO'].fillna(0)
-    #df['DEPT_NO'] = df['DEPT_NO'].astype(int, errors='ignore')
     df['SUM_SCORES'] = round(df['SUM_SCORES']*100)
     df['OVERALL_SCORE'] = round(df['OVERALL_SCORE']*100)
     df['SENTIMENT_IND'] = df['OVERALL_SENTIMENT'].apply(lambda x: 1 if x =='Positive' else 0)
